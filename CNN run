@@ -1,0 +1,423 @@
+
+R version 3.6.1 (2019-07-05) -- "Action of the Toes"
+Copyright (C) 2019 The R Foundation for Statistical Computing
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Workspace loaded from ~/research/courses/R Deep learning projrects/projects/MNIST/.RData]
+
+> library(dslabs)
+> library(caret)
+Loading required package: lattice
+Loading required package: ggplot2
+> library(nnet)
+> data <- read.csv ("train.csv")
+> set.seed(42)
+> train_perc = 0.75
+> train_index <- createDataPartition(data$label, p=train_perc, list=FALSE)
+> data_train <- data[train_index,]
+> data_test <- data[-train_index,]
+> library(mxnet)
+> data_train <- data.matrix(data_train)
+> data_train.x <- data_train[,-1]
+> data_train.x <- t(data_train.x/255)
+> data_train.y <- data_train[,1]
+> 
+> data <- mx.symbol.Variable("data")
+> fc1 <- mx.symbol.FullyConnected(data, name="fc1", num_hidden=128)
+> act1 <- mx.symbol.Activation(fc1, name="relu1", act_type="relu")
+> fc2 <- mx.symbol.FullyConnected(act1, name="fc2", num_hidden=64)
+> act2 <- mx.symbol.Activation(fc2, name="relu2", act_type="relu")
+> fc3 <- mx.symbol.FullyConnected(act2, name="fc3", num_hidden=10)
+> softmax <- mx.symbol.SoftmaxOutput(fc3, name="sm")
+> devices <- mx.cpu()
+> mx.set.seed(42)
+> model_dnn <- mx.model.FeedForward.create(softmax, X=data_train.x, y=data_train.y, ctx=devices, num.round=30, array.batch.size=100,learning.rate=0.01, momentum=0.9, eval.metric=mx.metric.accuracy,initializer=mx.init.uniform(0.1),epoch.end.callback=mx.callback.log.train.metric(1000))
+Start training with 1 devices
+[1] Train-accuracy=0.733227848275741
+[2] Train-accuracy=0.908449367443217
+[3] Train-accuracy=0.929588609292537
+[4] Train-accuracy=0.941613923899735
+[5] Train-accuracy=0.952120255254492
+[6] Train-accuracy=0.95924051011665
+[7] Train-accuracy=0.965000007348725
+[8] Train-accuracy=0.969683553033237
+[9] Train-accuracy=0.973987351489973
+[10] Train-accuracy=0.977468364600894
+[11] Train-accuracy=0.979810137160217
+[12] Train-accuracy=0.982468363604968
+[13] Train-accuracy=0.984778491756584
+[14] Train-accuracy=0.98699368102641
+[15] Train-accuracy=0.988797477529019
+[16] Train-accuracy=0.990506336847438
+[17] Train-accuracy=0.992215196731724
+[18] Train-accuracy=0.993544309576855
+[19] Train-accuracy=0.994525321488139
+[20] Train-accuracy=0.995569624478304
+[21] Train-accuracy=0.99629747188544
+[22] Train-accuracy=0.997025319292576
+[23] Train-accuracy=0.997310129147542
+[24] Train-accuracy=0.99768987562083
+[25] Train-accuracy=0.99816455871244
+[26] Train-accuracy=0.99860759626461
+[27] Train-accuracy=0.998765823961813
+[28] Train-accuracy=0.998955697198457
+[29] Train-accuracy=0.999113924895661
+[30] Train-accuracy=0.999335443671746
+Warning message:
+In mx.model.select.layout.train(X, y) :
+  Auto detect layout input matrix, use colmajor..
+
+> 
+> 
+> data_test.x <- data_test[,-1]
+> data_test.x <- t(data_test.x/255)
+> 
+> prob_dnn <- predict(model_dnn, data_test.x)
+Warning message:
+In mx.model.select.layout.predict(X, model) :
+  Auto detect layout input matrix, use colmajor..
+
+> prediction_dnn <- max.col(t(prob_dnn)) - 1
+> cm_dnn = table(data_test$label, prediction_dnn)
+> cm_dnn
+   prediction_dnn
+       0    1    2    3    4    5    6    7    8    9
+  0 1000    0    1    0    0    3    5    2    1    1
+  1    0 1128    1    4    2    0    2    1    2    1
+  2    5    5 1064    6    2    2    4    2    3    1
+  3    2    1    9 1043    0   12    0    3    2    6
+  4    3    1    2    0  989    1    5    1    5   20
+  5    0    1    1    6    1  906    2    0    4    3
+  6    6    1    1    0    1   10 1014    0    3    0
+  7    5    3    9    1    3    0    0 1094    0    8
+  8    4   10    6    8    3    9    6    4  975    8
+  9    4    2    0   10   12    7    0   10    4  980
+> accuracy_dnn = mean(prediction_dnn == data_test$label)
+> accuracy_dnn
+[1] 0.9709468
+> conv1 <- mx.symbol.Convolution(data=data, kernel=c(5,5),num_filter=20)
+> act1 <- mx.symbol.Activation(data=conv1, act_type="relu")
+> pool1 <- mx.symbol.Pooling(data=act1, pool_type="max",kernel=c(2,2), stride=c(2,2))
+> 
+> # second convolution
+> conv2 <- mx.symbol.Convolution(data=pool1, kernel=c(5,5),num_filter=50)
+> act2 <- mx.symbol.Activation(data=conv2, act_type="relu")
+> pool2 <- mx.symbol.Pooling(data=act2, pool_type="max",kernel=c(2,2), stride=c(2,2))
+> 
+> flatten <- mx.symbol.Flatten(data=pool2)
+> 
+> # first fully connected layer
+> fc1 <- mx.symbol.FullyConnected(data=flatten, num_hidden=500)
+> act3 <- mx.symbol.Activation(data=fc1, act_type="relu")
+> 
+> # second fully connected layer
+> fc2 <- mx.symbol.FullyConnected(data=act3, num_hidden=10)
+> 
+> # softmax output
+> softmax <- mx.symbol.SoftmaxOutput(data=fc2, name="sm")
+> 
+> #data manipulation
+> train.array <- data_train.x
+> dim(train.array) <- c(28, 28, 1, ncol(data_train.x))
+> mx.set.seed(42)
+> model_cnn <- mx.model.FeedForward.create(softmax, X=train.array,y=data_train.y, ctx=devices, num.round=30,array.batch.size=100, learning.rate=0.05,momentum=0.9, wd=0.00001,eval.metric=mx.metric.accuracy,epoch.end.callback=mx.callback.log.train.metric(100))
+Start training with 1 devices
+[1] Train-accuracy=0.316202531391873
+[2] Train-accuracy=0.960791143058222
+[3] Train-accuracy=0.98132912305337
+[4] Train-accuracy=0.987689882328239
+[5] Train-accuracy=0.990632918816579
+[6] Train-accuracy=0.992088614762584
+[7] Train-accuracy=0.994367093979558
+[8] Train-accuracy=0.995537978750241
+[9] Train-accuracy=0.996075953109355
+[10] Train-accuracy=0.996170889727677
+[11] Train-accuracy=0.997594939002508
+[12] Train-accuracy=0.997278483608101
+[13] Train-accuracy=0.997531647923626
+[14] Train-accuracy=0.998006331015237
+[15] Train-accuracy=0.998512659646288
+[16] Train-accuracy=0.998417723027966
+[17] Train-accuracy=0.999113924895661
+[18] Train-accuracy=0.998829115040695
+[19] Train-accuracy=0.99952531690839
+[20] Train-accuracy=0.999430380290068
+[21] Train-accuracy=0.999810126763356
+[22] Train-accuracy=0.999968354460559
+[23] Train-accuracy=0.999905063381678
+[24] Train-accuracy=0.999968354460559
+[25] Train-accuracy=1
+[26] Train-accuracy=1
+[27] Train-accuracy=1
+[28] Train-accuracy=1
+[29] Train-accuracy=1
+[30] Train-accuracy=1
+> 
+> 
+> test.array <- data_test.x
+> dim(test.array) <- c(28, 28, 1, ncol(data_test.x))
+> prob_cnn <- predict(model_cnn, test.array)
+> prediction_cnn <- max.col(t(prob_cnn)) - 1
+> cm_cnn = table(data_test$label, prediction_cnn)
+> cm_cnn
+   prediction_cnn
+       0    1    2    3    4    5    6    7    8    9
+  0 1009    1    1    0    0    0    2    0    0    0
+  1    0 1137    0    0    1    0    0    1    2    0
+  2    1    2 1081    1    1    0    2    3    2    1
+  3    1    0    2 1073    0    0    0    1    1    0
+  4    0    0    2    0 1019    0    1    1    2    2
+  5    0    0    0    4    0  914    3    0    2    1
+  6    3    0    0    0    0    2 1026    0    5    0
+  7    0    3    2    0    1    0    0 1114    1    2
+  8    0    2    0    1    1    3    0    0 1023    3
+  9    4    4    0    3    6    3    0    4    2 1003
+> accuracy_cnn = mean(prediction_cnn == data_test$label)
+> accuracy_cnn
+[1] 0.9905696
+> 
+> # Visualize the model
+> 
+> graph.viz(model_cnn$symbol)
+
+
+> data_test.y <- data_test[,1]
+> logger <- mx.metric.logger$new()
+> model_cnn <- mx.model.FeedForward.create(softmax, X=train.array, y=data_train.y,eval.data=list(data=test.array, label=data_test.y), ctx=devices, num.round=30, array.batch.size=100,learning.rate=0.05, momentum=0.9, wd=0.00001, eval.metric=mx.metric.accuracy, epoch.end.callback = mx.callback.log.train.metric(1, logger))
+Start training with 1 devices
+[1] Train-accuracy=0.305474682304348
+[1] Validation-accuracy=0.91228571392241
+[2] Train-accuracy=0.960316458834877
+[2] Validation-accuracy=0.976952389876048
+[3] Train-accuracy=0.978829124305822
+[3] Validation-accuracy=0.98304763180869
+[4] Train-accuracy=0.985791148452819
+[4] Validation-accuracy=0.980857156571888
+[5] Train-accuracy=0.989493679208092
+[5] Validation-accuracy=0.985142867905753
+[6] Train-accuracy=0.991202539469622
+[6] Validation-accuracy=0.985333343914577
+[7] Train-accuracy=0.993291144884085
+[7] Validation-accuracy=0.985047629333678
+[8] Train-accuracy=0.994746840452846
+[8] Validation-accuracy=0.985714295364562
+[9] Train-accuracy=0.995284814623338
+[9] Validation-accuracy=0.985714298202878
+[10] Train-accuracy=0.995506333399423
+[10] Validation-accuracy=0.988666676339649
+[11] Train-accuracy=0.996708863709546
+[11] Validation-accuracy=0.984285723027729
+[12] Train-accuracy=0.996993673753135
+[12] Validation-accuracy=0.987523819151379
+[13] Train-accuracy=0.997468356844745
+[13] Validation-accuracy=0.989238104366121
+[14] Train-accuracy=0.997563293463067
+[14] Validation-accuracy=0.984666677883693
+[15] Train-accuracy=0.998069622094118
+[15] Validation-accuracy=0.989428580942608
+[16] Train-accuracy=0.998227849791322
+[16] Validation-accuracy=0.988761913208734
+[17] Train-accuracy=0.998101267633559
+[17] Validation-accuracy=0.987714296295529
+[18] Train-accuracy=0.998765823961813
+[18] Validation-accuracy=0.988000010308765
+[19] Train-accuracy=0.998417723027966
+[19] Validation-accuracy=0.988761914911724
+[20] Train-accuracy=0.999050633816779
+[20] Validation-accuracy=0.989619056383769
+[21] Train-accuracy=0.999430380290068
+[21] Validation-accuracy=0.989619055816105
+[22] Train-accuracy=0.999018988277339
+[22] Validation-accuracy=0.989523818379357
+[23] Train-accuracy=0.999493671368949
+[23] Validation-accuracy=0.989714294955844
+[24] Train-accuracy=0.999936708921119
+[24] Validation-accuracy=0.990190484977904
+[25] Train-accuracy=0.99955696244783
+[25] Validation-accuracy=0.989333342938196
+[26] Train-accuracy=0.998734178422373
+[26] Validation-accuracy=0.990190484977904
+[27] Train-accuracy=0.999778481223915
+[27] Validation-accuracy=0.990761913004376
+[28] Train-accuracy=0.999873417842237
+[28] Validation-accuracy=0.991047627017612
+[29] Train-accuracy=1
+[29] Validation-accuracy=0.992000007061731
+[30] Train-accuracy=1
+[30] Validation-accuracy=0.991904769057319
+
+> 
+> plot(logger$train,type="l",col="red", ann=FALSE)
+> lines(logger$eval,type="l", col="blue")
+> title(main="Learning curve")
+> title(xlab="Iterations")
+> title(ylab="Accuary")
+> legend(20, 0.5, c("training","testing"), cex=0.8, 
++        col=c("red","blue"), pch=21:22, lty=1:2);
+
+> par(mfrow=c(1,2))  #set screen distribution
+> test_1 <- matrix(as.numeric(data_test[1,-1]), nrow = 28, byrow = TRUE)
+> image(rotate(test_1), col = grey.colors(255))
+> test_2 <- matrix(as.numeric(data_test[2,-1]), nrow = 28, byrow = TRUE)
+> image(rotate(test_2), col = grey.colors(255))
+> 
+> layerss_for_viz <- mx.symbol.Group(c(conv1, act1, pool1, conv2, act2, pool2, fc1, fc2))
+> executor <- mx.simple.bind(symbol=layerss_for_viz, data=dim(test.array), ctx=mx.cpu())
+> 
+> mx.exec.update.arg.arrays(executor, model_cnn$arg.params, match.name=TRUE)
+> mx.exec.update.aux.arrays(executor, model_cnn$aux.params, match.name=TRUE)
+> 
+> 
+> mx.exec.update.arg.arrays(executor, list(data=mx.nd.array(test.array)), match.name=TRUE)
+> mx.exec.forward(executor, is.train=FALSE)
+> 
+> 
+> 
+> names(executor$ref.outputs)
+[1] "convolution0_output"    "activation0_output"     "pooling0_output"        "convolution1_output"   
+[5] "activation1_output"     "pooling1_output"        "fullyconnected0_output" "fullyconnected1_output"
+>
+> 
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$pooling10_output)[,,i,1]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+Error in dim(x) <- length(x) : attempt to set an attribute on NULL
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$pooling10_output)[,,i,2]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+Error in dim(x) <- length(x) : attempt to set an attribute on NULL
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$activation1_output)[,,i,1]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$activation1_output)[,,i,1]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$activation0_output)[,,i,1]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+> 
+
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$activation0_output)[,,i,2]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$pooling0_output)[,,i,1]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$pooling0_output)[,,i,2]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$convolution1_output)[,,i,1]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+> par(mfrow=c(4,4), mar=c(0.1,0.1,0.1,0.1))
+> for (i in 1:16) {
++     outputData <- as.array(executor$ref.outputs$convolution1_output)[,,i,2]
++     image(outputData, xaxt='n', yaxt='n', col=grey.colors(255)
++     )
++ }
+
+
+> 
+> validation_perc = 0.4
+> validation_index <- createDataPartition(data_test.y, p=validation_perc, list=FALSE)
+> 
+> 
+> validation.array <- test.array[, , , validation_index]
+> dim(validation.array) <- c(28, 28, 1, length(validation.array[1,1,]))
+> data_validation.y <- data_test.y[validation_index]
+> final_test.array <- test.array[, , , -validation_index]
+> dim(final_test.array) <- c(28, 28, 1, length(final_test.array[1,1,]))
+> data_final_test.y <- data_test.y[-validation_index]
+> 
+> 
+> mx.callback.early.stop <- function(eval.metric) {
++     function(iteration, nbatch, env, verbose) {
++         if (!is.null(env$metric)) {
++             if (!is.null(eval.metric)) {
++                 result <- env$metric$get(env$eval.metric)
++                 if (result$value >= eval.metric) {
++                     return(FALSE)
++                 }
++             }
++         }
++         return(TRUE)
++     }
++ }
+> 
+> model_cnn_earlystop <- mx.model.FeedForward.create(softmax, X=train.array, y=data_train.y,
++                                                    eval.data=list(data=validation.array, label=data_validation.y),
++                                                    ctx=devices, num.round=30, array.batch.size=100,
++                                                    learning.rate=0.05, momentum=0.9, wd=0.00001,
++                                                    eval.metric=mx.metric.accuracy,
++                                                    epoch.end.callback = mx.callback.early.stop(0.985))
+Start training with 1 devices
+[1] Train-accuracy=0.258639240719944
+[1] Validation-accuracy=0.920232560745505
+[2] Train-accuracy=0.95933544824395
+[2] Validation-accuracy=0.966744190038637
+[3] Train-accuracy=0.980221529927435
+[3] Validation-accuracy=0.976976753667343
+[4] Train-accuracy=0.985474692492545
+[4] Validation-accuracy=0.983488383681275
+[5] Train-accuracy=0.990158235724968
+[5] Validation-accuracy=0.986976753833682
+> 
+> prob_cnn <- predict(model_cnn_earlystop, final_test.array)
+> prediction_cnn <- max.col(t(prob_cnn)) - 1
+> cm_cnn = table(data_final_test.y, prediction_cnn)
+> cm_cnn
+                 prediction_cnn
+data_final_test.y   0   1   2   3   4   5   6   7   8   9
+                0 607   0   0   0   0   0   1   0   0   0
+                1   0 665   3   0   2   0   1   0   5   0
+                2   0   0 648   0   2   0   1   6   6   1
+                3   0   0   4 645   0   2   0   2   7   0
+                4   0   0   2   0 595   0   2   1   2   1
+                5   0   0   1   0   0 536   2   0   4   0
+                6   4   0   0   0   1   0 605   0   4   0
+                7   0   2   5   0   0   0   0 682   2   1
+                8   0   1   0   0   0   0   1   0 604   2
+                9   2   2   0   2   4   6   1   5   6 601
+> accuracy_cnn = mean(prediction_cnn == data_final_test.y)
+> accuracy_cnn
+[1] 0.9826902
+> 
